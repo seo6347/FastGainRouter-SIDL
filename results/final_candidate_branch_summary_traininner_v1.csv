@@ -1,0 +1,5 @@
+branch,psnr,ssim,lpips,checkpoint_mb,pure_forward_median_ms,delta_psnr_vs_base,delta_lpips_vs_base,pure_latency_delta_vs_base
+input,21.6725,0.807,0.2573,0.0,0.0,-1.4211,0.0174,-8.7702
+tiny,22.9878,0.8082,0.242,0.3461,8.3217,-0.1057,0.002,-0.4486
+base,23.0935,0.8145,0.2399,1.1662,8.7702,0.0,0.0,0.0
+high,23.1499,0.8179,0.2528,9.7603,11.8145,0.0564,0.0129,3.0442

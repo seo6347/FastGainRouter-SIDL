@@ -1,0 +1,20 @@
+# Core
+numpy
+pandas
+tqdm
+matplotlib
+opencv-python
+scikit-image
+scikit-learn
+joblib
+pyyaml
+
+# Deep learning
+torch
+torchvision
+
+# Perceptual metric
+lpips
+
+# Restoration framework
+basicsr

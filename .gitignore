@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environments
+.env
+.venv/
+venv/
+*.egg-info/
+
+# Logs
+logs/
+*.log
+wandb/
+runs/
+
+# Data
+data/
+data_full/
+dataset/
+datasets/
+SIDL/
+raw_data/
+
+# Checkpoints / models
+*.pth
+*.pt
+*.ckpt
+training_states/
+experiments/
+checkpoints/
+*.joblib
+
+# Large outputs
+outputs/
+visualization/
+baseline/NAFNet/results/
+baseline/NAFNet/experiments/
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.npy
+*.npz
+
+# Bulk generated images
+generated_images/
+qualitative_candidates/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# LaTeX auxiliary
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls

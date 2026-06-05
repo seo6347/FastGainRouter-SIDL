@@ -1,0 +1,14 @@
+/data/donggyun/FastGainRouter-SIDL/paper/figures/fig_candidate_lpips_forward_latency_traininner_v1.png
+/data/donggyun/FastGainRouter-SIDL/paper/figures/fig_candidate_psnr_forward_latency_traininner_v1.png
+/data/donggyun/FastGainRouter-SIDL/paper/figures/fig_compact_action_ratio_v1.png
+/data/donggyun/FastGainRouter-SIDL/paper/figures/fig_compact_psnr_latency_v1.png
+/data/donggyun/FastGainRouter-SIDL/paper/figures/method_overview_v1.pdf
+/data/donggyun/FastGainRouter-SIDL/paper/figures/method_overview_v1.png
+/data/donggyun/FastGainRouter-SIDL/paper/README.md
+/data/donggyun/FastGainRouter-SIDL/paper/references.bib
+/data/donggyun/FastGainRouter-SIDL/paper/tables/paper_key_claims.txt
+/data/donggyun/FastGainRouter-SIDL/paper/tables/table_branch_optimal_ratio.tex
+/data/donggyun/FastGainRouter-SIDL/paper/tables/table_candidate_branch_audit.tex
+/data/donggyun/FastGainRouter-SIDL/paper/tables/table_gain_analysis.tex
+/data/donggyun/FastGainRouter-SIDL/paper/tables/table_main_quantitative_results.tex
+/data/donggyun/FastGainRouter-SIDL/paper/tables/table_split_usage.tex

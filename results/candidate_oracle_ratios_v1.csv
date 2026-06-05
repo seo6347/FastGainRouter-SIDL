@@ -1,0 +1,17 @@
+oracle_type,branch,ratio,count
+oracle_label_psnr,input,0.2702898550724638,1492
+oracle_label_psnr,tiny,0.2777173913043478,1533
+oracle_label_psnr,base,0.4519927536231884,2495
+oracle_label_psnr,high,0.0,0
+oracle_label_lpips,input,0.24692028985507247,1363
+oracle_label_lpips,tiny,0.2798913043478261,1545
+oracle_label_lpips,base,0.4731884057971015,2612
+oracle_label_lpips,high,0.0,0
+oracle_label_psnr_4way,input,0.25778985507246377,1423
+oracle_label_psnr_4way,tiny,0.2418478260869565,1335
+oracle_label_psnr_4way,base,0.30869565217391304,1704
+oracle_label_psnr_4way,high,0.19166666666666668,1058
+oracle_label_lpips_4way,input,0.24039855072463767,1327
+oracle_label_lpips_4way,tiny,0.26811594202898553,1480
+oracle_label_lpips_4way,base,0.3746376811594203,2068
+oracle_label_lpips_4way,high,0.11684782608695653,645

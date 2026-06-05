@@ -1,0 +1,42 @@
+name: NAFNet-SIDL-v2-tiny-lr1e3-clean-easy-val
+model_type: ImageRestorationModel
+scale: 1
+num_gpu: 1
+manual_seed: 42
+
+datasets:
+  test:
+    name: sidl-clean-easy-val
+    type: PairedImageDataset
+    dataroot_gt: /data/donggyun/SIDL_project/data_full/val/clean/easy/target
+    dataroot_lq: /data/donggyun/SIDL_project/data_full/val/clean/easy/input
+    io_backend:
+      type: disk
+
+network_g:
+  type: NAFNetLocal
+  width: 4
+  enc_blk_nums: [1, 1, 1, 1]
+  middle_blk_num: 1
+  dec_blk_nums: [1, 1, 1, 1]
+
+path:
+  pretrain_network_g: /data/donggyun/SIDL_project/baseline/NAFNet/experiments/NAFNet-SIDL-all-tiny-width4-lr1e3-es20000-v1/models/best_net_g.pth
+  strict_load_g: true
+  resume_state: ~
+
+val:
+  save_img: true
+  metrics:
+    psnr:
+      type: calculate_psnr
+      crop_border: 0
+      test_y_channel: false
+    ssim:
+      type: calculate_ssim
+      crop_border: 0
+      test_y_channel: false
+
+dist_params:
+  backend: nccl
+  port: 29500

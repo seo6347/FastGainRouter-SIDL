@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\caption{Candidate branch audit on the official validation set. Lower LPIPS is better.}
+\label{tab:candidate}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{lccccc}
+\toprule
+Branch & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & Ckpt (MB) & Forward (ms) \\
+\midrule
+Input & 21.6725 & 0.8070 & 0.2573 & 0.00 & 0.00 \\
+Tiny & 22.9878 & 0.8082 & 0.2420 & 0.35 & 8.32 \\
+Base & 23.0935 & 0.8145 & 0.2399 & 1.17 & 8.77 \\
+High & 23.1499 & 0.8179 & 0.2528 & 9.76 & 11.81 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
