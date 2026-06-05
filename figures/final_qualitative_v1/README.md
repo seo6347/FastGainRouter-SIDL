@@ -1,6 +1,8 @@
-# Final Qualitative Figure
+# Final Compact Qualitative Figure
 
-This folder contains the final selected qualitative examples for the FastGainRouter paper/report.
+This folder contains the compact qualitative figure used for the paper/report.
+
+The figure uses zoom crops only to keep examples readable in a two-column paper.
 
 Rows:
 1. A Skip/Input branch: water/easy
@@ -8,6 +10,6 @@ Rows:
 3. C Base needed: dust/medium
 4. D Efficient small-loss: clean/hard
 
-Main grid:
-- qualitative_grid_v1.png
+Columns:
+Input | Tiny | Base | Ours | GT
 
