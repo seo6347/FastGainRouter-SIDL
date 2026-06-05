@@ -58,4 +58,3 @@ Large files are intentionally excluded:
 - large router `.joblib` artifacts
 
 This repository is intended for code and result-summary release, not for storing full experiment artifacts.
-# FastGainRouter-SIDL
