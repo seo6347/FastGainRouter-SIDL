@@ -22,7 +22,7 @@ See:
 
 - `results/final_compact_main_table_v1.csv`
 - `results/final_compact_key_claims_v1.txt`
-- `figures/final_compact/`
+- `paper/figures/`
 
 ## Repository Structure
 
@@ -58,3 +58,18 @@ Large files are intentionally excluded:
 - large router `.joblib` artifacts
 
 This repository is intended for code and result-summary release, not for storing full experiment artifacts.
+
+## Paper Assets
+
+Final paper figures are stored in:
+
+```text
+paper/figures/
+```
+
+The final paper source is stored in:
+
+```text
+paper/main.tex
+paper/references.bib
+```

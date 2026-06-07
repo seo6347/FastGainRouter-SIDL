@@ -1,36 +1,22 @@
-# Paper Assets
+# Paper Source
 
-This folder contains paper-related assets for the FastGainRouter SIDL project.
+This folder contains the final paper source and paper-ready figures.
 
-## Tables
-
-LaTeX table snippets are in:
+## Files
 
 ```text
-paper/tables/
+main.tex
+references.bib
+figures/
 ```
 
-They are generated from final CSV results in `results/`.
-
-## Figures
-
-Paper-ready figures are copied or generated into:
+## Final figures
 
 ```text
-paper/figures/
+figures/method_overview.pdf
+figures/psnr_latency_tradeoff.pdf
+figures/branch_usage.pdf
+figures/qualitative_grid.png
 ```
 
-Current required figure status:
-
-- Method overview: generated if matplotlib was available.
-- PSNR-latency plot: copied.
-- Action ratio plot: copied.
-- Qualitative grid: TODO.
-
-## References
-
-`references.bib` is included, but entries marked `[CHECK BIBTEX]` should be verified before final submission.
-
-## Main LaTeX
-
-[TODO] Add or update `main.tex` after final paper editing.
+The qualitative figure omits the Ours column because the router output is one of Input, Tiny, or Base. The selected branch is highlighted with a red border.

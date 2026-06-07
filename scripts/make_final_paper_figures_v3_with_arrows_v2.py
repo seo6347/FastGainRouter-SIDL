@@ -353,6 +353,71 @@ def build_psnr_latency_plot():
             zorder=3,
         )
 
+    # ------------------------------------------------------------
+    # PSNR-latency improvement arrows
+    # ------------------------------------------------------------
+    # The arrows are intentionally subtle: they indicate movement in the
+    # PSNR-latency plane without visually overstating the small PSNR gaps.
+    point_map = {
+        r["display"]: (float(r["latency_ms"]), float(r["psnr"]))
+        for _, r in df.iterrows()
+    }
+
+    def add_tradeoff_arrow(start_name, end_name, label_xy=None):
+        start = point_map[start_name]
+        end = point_map[end_name]
+
+        delta_psnr = end[1] - start[1]
+        rel_latency_reduction = (start[0] - end[0]) / start[0] * 100.0
+        label = f"+{delta_psnr:.3f} dB, -{rel_latency_reduction:.1f}%"
+
+        ax.annotate(
+            "",
+            xy=end,
+            xytext=start,
+            arrowprops=dict(
+                arrowstyle="->",
+                linewidth=1.1,
+                linestyle="--",
+                color="0.35",
+                shrinkA=6,
+                shrinkB=6,
+                mutation_scale=12,
+            ),
+            zorder=2,
+        )
+
+        # Place labels away from the dashed arrow paths so they do not cover the arrows.
+        # Coordinates are in data units: (latency ms/img, PSNR dB).
+        if label_xy is None:
+            label_xy = ((start[0] + end[0]) / 2.0, (start[1] + end[1]) / 2.0)
+
+        ax.text(
+            label_xy[0],
+            label_xy[1],
+            label,
+            fontsize=8,
+            color="0.25",
+            ha="center",
+            va="center",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.82, pad=1.0),
+            zorder=4,
+        )
+
+    # Always Base -> Ours-Balanced: place label below the arrow path.
+    add_tradeoff_arrow(
+        "Always Base",
+        "Ours-Balanced",
+        label_xy=(111.2, 23.095),
+    )
+
+    # Always Tiny -> Ours-Efficient: place label to the lower-left of the arrow path.
+    add_tradeoff_arrow(
+        "Always Tiny",
+        "Ours-Efficient",
+        label_xy=(103, 23.01),
+    )
+
     offsets = {
         "Always Tiny": (7, -14),
         "Always Base": (7, 4),
@@ -368,6 +433,7 @@ def build_psnr_latency_plot():
             textcoords="offset points",
             xytext=(dx, dy),
             fontsize=9,
+            zorder=4,
         )
 
     ax.set_xlabel("Component-based latency (ms / image)")
@@ -464,7 +530,7 @@ def write_status():
         "# Paper-ready Figures v3\n\n"
         "Generated figures:\n\n"
         "- qualitative_grid_v1.png: compact qualitative crop grid without row-title bands, with larger PSNR/LPIPS labels.\n"
-        "- fig_psnr_latency_focus_v2.png/pdf: clean focused PSNR-latency plot without an in-plot title.\n"
+        "- fig_psnr_latency_focus_v2.png/pdf: focused PSNR-latency plot with subtle improvement arrows.\n"
         "- fig_action_ratio_horizontal_v2.png/pdf: horizontal branch usage plot with percentages.\n\n"
         "Canonical copies are stored in `paper/figures/`.\n",
         encoding="utf-8",
@@ -477,7 +543,7 @@ def main():
     if not CAND_ROOT.exists():
         raise FileNotFoundError(CAND_ROOT)
 
-    build_qualitative_grid()
+    # build_qualitative_grid()
     build_psnr_latency_plot()
     build_action_ratio_plot()
     write_status()

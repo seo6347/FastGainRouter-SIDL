@@ -1,10 +1,25 @@
-\documentclass[10pt,twocolumn]{article}
+\documentclass[11pt]{article}
+
+% ============================================================
+% FastGainRouter single-column paper draft
+% Revision focus:
+% - Clarify component-based pipeline latency vs branch-level micro-benchmark
+% - Define Balanced/Efficient operating points
+% - Reduce defensive discussion tone
+% - Compact Table 3/4
+% - Keep references on a separate page
+% ============================================================
 
 % ------------------------------------------------------------
-% Packages
+% Page layout
 % ------------------------------------------------------------
-\usepackage[margin=0.72in]{geometry}
+\usepackage[top=0.82in,bottom=0.82in,left=0.88in,right=0.88in]{geometry}
 \usepackage{times}
+\usepackage{microtype}
+
+% ------------------------------------------------------------
+% Core packages
+% ------------------------------------------------------------
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{multirow}
@@ -16,9 +31,11 @@
 \usepackage{subcaption}
 \usepackage{hyperref}
 \usepackage{float}
+\usepackage{placeins}
 \usepackage{balance}
-\usepackage[section]{placeins}
-\usepackage{dblfloatfix}
+\usepackage{titlesec}
+
+\graphicspath{{figures/}}
 
 \hypersetup{
     colorlinks=true,
@@ -27,24 +44,44 @@
     urlcolor=blue
 }
 
-\graphicspath{{figures/}}
-
-% Compact table settings
-\setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.05}
+% ------------------------------------------------------------
+% Compact formatting
+% ------------------------------------------------------------
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.08}
 \setlist[itemize]{leftmargin=*, topsep=2pt, itemsep=1pt}
+\captionsetup{font=small, labelfont=bf}
+
+\titlespacing*{\section}{0pt}{0.9em}{0.35em}
+\titlespacing*{\subsection}{0pt}{0.65em}{0.25em}
+\titlespacing*{\paragraph}{0pt}{0.45em}{0.5em}
+
+% Abstract style similar to compact single-column technical reports.
+\renewenvironment{abstract}{
+    \vspace{-0.4em}
+    \noindent\textbf{Abstract.}\quad
+}{
+    \par\vspace{0.7em}
+}
 
 % ------------------------------------------------------------
 % Title
 % ------------------------------------------------------------
-\title{FastGainRouter: Input-Adaptive Efficient Restoration for Smartphone Images with Dirty Lenses}
+\title{\vspace{-1.0em}
+FastGainRouter: Input-Adaptive Efficient Restoration for Smartphone Images with Dirty Lenses
+\vspace{-0.4em}
+}
 
 \author{
-Donggyun Seo \\
-Department of AI Software, Soongsil University \\
-\texttt{[TODO: your-email@example.com]}
+\textbf{Donggyun Seo}\\
+Department of AI Software\\
+Soongsil University\\
+\texttt{seo6347@soongsil.ac.kr}
 }
-\date{}
+
+\date{\vspace{-0.8em}}
 
 \begin{document}
 \maketitle
@@ -53,53 +90,51 @@ Department of AI Software, Soongsil University \\
 % Abstract
 % ------------------------------------------------------------
 \begin{abstract}
-Smartphone images captured through contaminated lenses suffer from spatially varying degradations such as dust, fingerprints, water droplets, scratches, and mixed lens artifacts.
-The SIDL benchmark introduced this realistic dirty-lens restoration problem and evaluated existing restoration models under fixed-model inference.
-However, applying the same restoration model to every input may be unnecessary or even suboptimal: some images are already close to the reference, some can be sufficiently restored by a lightweight model, and only a subset benefits from a stronger model.
-We study input-adaptive restoration budget selection for SIDL and propose \textbf{FastGainRouter}, a lightweight routing framework that selects one of three branches: \textit{Input}, which bypasses restoration; \textit{Tiny}, a width-4 NAFNet-based lightweight model; and \textit{Base}, a width-8 NAFNet-based stronger model.
-Instead of predicting a hard oracle branch label, the router predicts two restoration gains: the expected improvement of Tiny over Input and the additional improvement of Base over Tiny.
-On the official SIDL validation set, Tiny improves PSNR over Input by 1.315 dB on average, while Base improves over Tiny by only 0.106 dB on average.
-In the balanced setting, FastGainRouter improves PSNR over Always Base by 0.031 dB while reducing component-based latency by 9.1\%.
-In the efficient setting, it reduces latency by 18.5\% with only 0.066 dB PSNR loss.
-These results suggest that input-adaptive restoration budget selection is a promising direction for efficient dirty-lens image restoration.
+Smartphone images captured through dirty lenses exhibit diverse degradations, including dust, fingerprints, water droplets, scratches, and mixed artifacts.
+The SIDL benchmark studies this real-world restoration problem under fixed-model inference, where the same restoration model is applied to all inputs.
+This work asks a complementary question: \emph{does every dirty-lens image require the same restoration budget?}
+We propose \textbf{FastGainRouter}, a lightweight input-adaptive framework that chooses among three branches: \textit{Input} for bypassing restoration, \textit{Tiny} for low-cost restoration, and \textit{Base} for stronger restoration.
+Rather than predicting unstable hard oracle labels, the router predicts restoration gains of Tiny over Input and Base over Tiny.
+On SIDL validation, the proposed router provides favorable PSNR-latency operating points: a balanced mode slightly improves PSNR over Always Base while reducing latency, and an efficient mode yields larger latency reduction with only a small PSNR loss.
+These results suggest that adaptive restoration budget selection is a useful complement to fixed-model dirty-lens restoration.
 \end{abstract}
+
+\textbf{Keywords:} dirty-lens restoration, SIDL, dynamic inference, efficient image restoration, routing.
 
 % ------------------------------------------------------------
 % 1. Introduction
 % ------------------------------------------------------------
 \section{Introduction}
 
-Smartphone cameras are ubiquitous in daily life, but their image quality can be significantly degraded by contaminated lenses.
-In real usage, lenses are frequently affected by water droplets, dust, fingerprints, scratches, and combinations of such contaminants.
-These degradations differ from standard image restoration problems such as Gaussian denoising, motion deblurring, or synthetic haze removal.
-Since the artifact is introduced at the lens surface before image formation, dirty-lens degradation can cause spatially non-uniform blur, light scattering, local occlusion, contrast reduction, and color distortion.
+Smartphone cameras are widely used in daily life, but their image quality can be degraded by contaminants on the lens surface.
+Water droplets, dust, fingerprints, scratches, and mixed contaminants can introduce spatially non-uniform blur, light scattering, local occlusion, contrast reduction, and color distortion.
+These artifacts differ from standard synthetic degradations such as Gaussian noise or motion blur because the degradation is introduced before image formation and varies across spatial regions and scenes.
 
 The SIDL benchmark introduced a real-world dataset for restoring smartphone images captured through dirty lenses \cite{sidl2025}.
-It provides paired degraded and clean reference images and evaluates representative restoration models such as AirNet, NAFNet, Restormer, FFTformer, DiffUIR, AutoDIR, and MambaIR.
-The Easy, Medium, and Hard categories in SIDL are used for evaluation and analysis rather than for dynamic model selection.
-Thus, SIDL primarily answers the question: \textit{how well does a fixed restoration model perform on dirty-lens images?}
+It provides paired degraded and clean reference images and evaluates representative restoration models under a fixed-model setting.
+Its Easy, Medium, and Hard categories are used for evaluation and analysis, not as routing signals for selecting different restoration models.
+Thus, the benchmark primarily asks how well a given restoration model performs on dirty-lens images.
 
-In this work, we ask a complementary question: \textit{does every dirty-lens image require the same restoration budget?}
-Some images are already close to their reference images, and applying a restoration model may introduce unnecessary smoothing or color shifts.
-Some images can be sufficiently restored by a small model, while only a subset benefits from a stronger model.
-Therefore, fixed-model restoration may be inefficient because it applies the same computational budget to all inputs.
+We study a complementary direction: \textit{input-adaptive restoration budget selection}.
+In dirty-lens restoration, not all inputs require the same computation.
+Some images are already close to the reference and can be damaged by unnecessary restoration.
+Many images can be restored sufficiently by a small model.
+Only a subset requires a stronger model.
+This motivates a routing framework that decides whether to skip restoration, use a lightweight branch, or use a stronger branch for each input.
 
-We formulate dirty-lens restoration as an input-adaptive branch selection problem.
-Given a degraded input image, our system selects one of three branches: \textbf{Input}, \textbf{Tiny}, or \textbf{Base}.
-The Input branch bypasses restoration and returns the degraded image unchanged.
-The Tiny branch is a lightweight NAFNet-based model, and the Base branch is a stronger NAFNet-based model.
-The goal is not to replace the SIDL benchmark or to claim state-of-the-art restoration quality, but to investigate whether input-adaptive restoration budget selection can provide a better quality-efficiency trade-off.
+We introduce \textbf{FastGainRouter}, which selects among three branches:
+\textbf{Input}, which returns the degraded image unchanged;
+\textbf{Tiny}, a width-4 NAFNet-based restoration model;
+and \textbf{Base}, a width-8 NAFNet-based model.
+Instead of directly classifying the best branch, FastGainRouter predicts two gains: the expected improvement of Tiny over Input and the additional improvement of Base over Tiny.
+This gain-based formulation avoids treating very small metric differences as hard class boundaries and better matches the quality-efficiency trade-off.
 
-A naive router could be trained to classify the branch with the highest PSNR.
-However, this hard oracle label can be unstable when the PSNR difference between two branches is very small.
-For example, if Base is only 0.02 dB better than Tiny, treating Base as the only correct class ignores the computational cost of using the stronger model.
-Instead, we propose \textbf{FastGainRouter}, which predicts restoration gains rather than hard branch labels.
-
-Our contributions are summarized as follows:
+\newpage
+Our contributions are:
 \begin{itemize}
-    \item We analyze Input/Tiny/Base branch behavior on SIDL and show that all three branches are optimal for a non-trivial portion of validation samples.
-    \item We propose FastGainRouter, a lightweight gain-based routing policy that predicts restoration gains from simple input image statistics.
-    \item We demonstrate that FastGainRouter improves the quality-latency trade-off over fixed baselines. In the balanced setting, it improves PSNR over Always Base while reducing component-based latency; in the efficient setting, it achieves larger latency reduction with a small PSNR loss.
+    \item We identify that over-restoration occurs in SIDL: Input, Tiny, and Base are each optimal for a non-trivial subset of validation samples.
+    \item We formulate adaptive restoration as gain prediction rather than hard branch classification, using lightweight image statistics at test time.
+    \item We show that FastGainRouter can reduce average component-based latency while maintaining comparable restoration quality to fixed Base inference.
 \end{itemize}
 
 % ------------------------------------------------------------
@@ -108,313 +143,213 @@ Our contributions are summarized as follows:
 \section{Related Work}
 
 \paragraph{Dirty-lens image restoration.}
-Image restoration has traditionally focused on degradations such as denoising, deblurring, super-resolution, deraining, and dehazing.
-Dirty-lens degradation is different because the artifact is caused by physical contaminants in front of the camera lens.
-SIDL addresses this underexplored problem by collecting paired smartphone images with realistic lens contaminants and clean references \cite{sidl2025}.
-Our work builds on SIDL but studies a different question: whether the restoration budget should be selected adaptively for each input rather than applying one fixed model to all images.
+Image restoration has traditionally focused on denoising, deblurring, super-resolution, deraining, and dehazing.
+Dirty-lens restoration differs because contaminants lie in front of the camera lens and create spatially varying scattering and occlusion.
+SIDL addresses this problem by collecting paired smartphone images with realistic lens contaminants \cite{sidl2025}.
+Our work does not replace the SIDL benchmark; rather, it explores whether restoration computation should be allocated adaptively across inputs.
 
 \paragraph{Deep image restoration.}
-Recent restoration models include CNN-based, transformer-based, and hybrid architectures.
-MPRNet uses a multi-stage progressive architecture for image restoration \cite{mprnet2021}.
-Restormer introduces an efficient transformer design for high-resolution restoration \cite{restormer2022}.
-NAFNet proposes a simple activation-free baseline that achieves strong restoration performance with efficient architecture design \cite{nafnet2022}.
-We use NAFNet variants to construct controlled Tiny and Base branches, since our goal is to analyze adaptive budget selection rather than to design a new restoration backbone.
+Modern restoration backbones include multi-stage CNNs, transformers, and simplified convolutional baselines.
+MPRNet uses a multi-stage progressive design \cite{mprnet2021}, Restormer introduces an efficient transformer for high-resolution restoration \cite{restormer2022}, and NAFNet provides a simple activation-free restoration baseline \cite{nafnet2022}.
+We use NAFNet variants only to construct controlled restoration branches.
+The focus of this work is not a new backbone, but when to invoke each branch.
 
-\paragraph{Dynamic inference and adaptive computation.}
-Dynamic inference methods allocate computation depending on input difficulty.
-BranchyNet introduces early exits to reduce computation for easy samples \cite{branchynet2016}.
-SkipNet learns to skip layers dynamically \cite{skipnet2018}.
-Slimmable Neural Networks allow inference at different network widths \cite{slimmable2019}, and Once-for-All trains a super-network from which specialized subnetworks can be selected for deployment constraints \cite{onceforall2020}.
-Our work shares the motivation that not all inputs require the same computation, but differs in that we route images among restoration branches and use predicted restoration gain as the routing signal.
+\paragraph{Dynamic inference.}
+Dynamic inference methods allocate computation according to input difficulty.
+BranchyNet uses early exits \cite{branchynet2016}, SkipNet learns dynamic layer skipping \cite{skipnet2018}, Slimmable Networks vary network width \cite{slimmable2019}, and Once-for-All trains a super-network for many deployment constraints \cite{onceforall2020}.
+Unlike classification-oriented dynamic inference, our router predicts restoration gains for dense image restoration outputs.
 
 % ------------------------------------------------------------
-% 3. Problem Setting and Dataset
+% 3. Problem Setup and Method
 % ------------------------------------------------------------
-\section{Problem Setting and Dataset}
+\section{Problem Setup and Method}
 
-\subsection{Input-Adaptive Restoration}
+Given a degraded dirty-lens input image $x$, a fixed restoration pipeline applies one model to all inputs.
+We instead define a branch set
+\[
+\mathcal{A}=\{\text{Input},\text{Tiny},\text{Base}\},
+\]
+and select a branch $a(x)\in\mathcal{A}$ for each sample.
+The Input branch is the identity path, Tiny is a lightweight restoration model, and Base is a stronger restoration model.
 
-Given a degraded dirty-lens image $x$, a standard restoration pipeline applies a fixed restoration model $f$:
-\begin{equation}
-    \hat{y} = f(x).
-\end{equation}
-In contrast, we define a set of candidate branches:
-\begin{equation}
-    \mathcal{A} = \{\text{Input}, \text{Tiny}, \text{Base}\}.
-\end{equation}
-The system selects a branch $a(x) \in \mathcal{A}$ for each input and produces:
-\begin{equation}
-    \hat{y} = f_{a(x)}(x).
-\end{equation}
-The Input branch is the identity function:
-\begin{equation}
-    f_{\text{Input}}(x)=x.
-\end{equation}
-
-\subsection{Dataset Splits}
-
-We use the SIDL dataset.
-The official validation set is kept as the final held-out evaluation set.
-The official training split is internally divided at the case level into \textit{train\_inner} and \textit{es\_val\_inner}.
-The train\_inner split is used for restoration model training and router gain target generation.
-The es\_val\_inner split is used for early stopping, best checkpoint selection, and router threshold tuning.
-The official validation set is used only for final evaluation.
-Case-level splitting is important because SIDL images are patch-based; multiple patches may originate from the same scene case.
-
-\begin{table}[!t]
-\centering
-\caption{Split usage in the final experimental protocol.}
-\label{tab:split}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{llrl}
-\toprule
-Split & Source & Samples & Usage \\
-\midrule
-train\_inner & official train & 51,264 & model training, router target generation \\
-es\_val\_inner & official train & 5,616 & early stopping, threshold tuning \\
-official val & official val & 5,520 & final evaluation only \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-\subsection{Evaluation Metrics}
-
-We report PSNR, SSIM, and LPIPS.
-PSNR and SSIM measure full-reference fidelity, while LPIPS provides a perceptual similarity measure.
-For efficiency, we report a measured component-based latency estimate, which includes fast feature extraction, batch router prediction, and selected branch inference.
-We also report pure forward latency for candidate branch analysis.
-
-% ------------------------------------------------------------
-% 4. Method
-% ------------------------------------------------------------
-\section{Method}
-
-\subsection{Overview}
-
-Our method consists of three branches and a lightweight gain router.
-Given an input image, we first compute fast image statistics.
-FastGainRouter predicts two restoration gains and selects Input, Tiny, or Base using a threshold-based decision rule.
-Figure~\ref{fig:overview} illustrates the overall pipeline.
-
-\begin{figure}[!t]
+\begin{figure}[t]
     \centering
-    \includegraphics[width=\columnwidth]{method_overview_v1.pdf}
+    \includegraphics[width=0.99\textwidth]{method_overview.png}
     \caption{
     Overview of FastGainRouter.
-    Given a degraded input image, the system extracts lightweight image statistics,
-    predicts restoration gains, and routes the sample to Input, Tiny, or Base.
+    The router computes lightweight image statistics from the degraded input, predicts restoration gains, and selects Input, Tiny, or Base.
+    Ground truth, difficulty labels, and metadata are not used at test time.
     }
     \label{fig:overview}
 \end{figure}
 
 \subsection{Branch Design}
 
-\paragraph{Input branch.}
-The Input branch returns the degraded image unchanged.
-This branch is necessary because restoration is not always beneficial.
-On the official validation set, Input is PSNR-optimal for 27.0\% of samples and LPIPS-optimal for 24.7\% of samples.
-This supports the use of a bypass path.
+The \textbf{Input} branch is included because restoration is not always beneficial.
+Some validation samples are closer to the reference before restoration, so forcing them through a restoration model may introduce smoothing, color shifts, or texture changes.
 
-\paragraph{Tiny branch.}
-Tiny is a width-4 NAFNet-based model.
-It serves as a lightweight restoration branch.
-On the official validation set, Tiny improves PSNR over Input by 1.315 dB on average, showing that even a very small restoration model provides meaningful restoration gain.
+The \textbf{Tiny} branch is a width-4 NAFNet-based model.
+It serves as a low-cost restoration path for inputs where a small model is sufficient.
+The \textbf{Base} branch is a width-8 NAFNet-based model and is used when stronger restoration is expected to provide additional benefit.
 
-\paragraph{Base branch.}
-Base is a width-8 NAFNet-based model.
-It serves as the stronger restoration branch.
-Base improves PSNR over Tiny by 0.106 dB on average and is PSNR-optimal for 45.2\% of validation samples.
-This indicates that Base remains useful but may not be necessary for every input.
-
-\paragraph{High candidate.}
-We also evaluate a width-16 High model.
-High achieves the highest average PSNR and SSIM, but it substantially worsens LPIPS and increases checkpoint size and pure forward latency.
-Therefore, High is not used in the main branch set and is instead reported as a candidate audit.
-
-\subsection{Fast Image Features}
-
-The router uses only lightweight statistics computed from the degraded input image:
-\begin{itemize}
-    \item grayscale mean and standard deviation,
-    \item dark pixel ratio and bright pixel ratio,
-    \item saturation mean and standard deviation,
-    \item HSV value mean and standard deviation,
-    \item Laplacian variance.
-\end{itemize}
-These features approximate brightness, contrast, saturation, exposure, and sharpness.
-The router does not use ground truth, degradation type, difficulty label, or metadata at test time.
-
-\subsection{Gain Target Generation}
+\subsection{Gain-Based Router}
 
 For each training sample, we compute PSNR values for Input, Tiny, and Base:
-\begin{equation}
-    P_I = \mathrm{PSNR}(x,y), \quad
-    P_T = \mathrm{PSNR}(f_T(x),y), \quad
-    P_B = \mathrm{PSNR}(f_B(x),y).
-\end{equation}
-We define two gain targets:
-\begin{equation}
-    g_{T-I} = P_T - P_I, \qquad
-    g_{B-T} = P_B - P_T.
-\end{equation}
-The first gain measures whether applying Tiny is useful compared with bypassing restoration.
-The second gain measures whether Base provides enough additional improvement over Tiny.
+$P_I$, $P_T$, and $P_B$.
+We define the gain targets
+\[
+g_{T-I}=P_T-P_I,\qquad g_{B-T}=P_B-P_T.
+\]
+The first gain measures whether Tiny improves over bypassing restoration.
+The second measures whether Base provides enough additional benefit over Tiny.
 
-\subsection{FastGainRouter and Decision Rule}
-
-FastGainRouter is implemented as a RandomForestRegressor.
-The input is the 9-dimensional feature vector, and the output is:
-\begin{equation}
-    \hat{g}(x) = [\hat{g}_{T-I}(x), \hat{g}_{B-T}(x)].
-\end{equation}
-The regressor is trained with a squared-error-based regression objective:
-\begin{equation}
-    \min_{\theta} \sum_i \|g_i - \hat{g}_{\theta}(x_i)\|_2^2.
-\end{equation}
-
-Given predicted gains, the branch is selected as:
-\begin{equation}
-a(x) =
+FastGainRouter is implemented as a random-forest regressor using nine lightweight input statistics: grayscale mean and standard deviation, dark and bright pixel ratios, saturation mean and standard deviation, HSV value mean and standard deviation, and Laplacian variance.
+Given predicted gains $\hat{g}_{T-I}$ and $\hat{g}_{B-T}$, the router selects
+\[
+a(x)=
 \begin{cases}
-\text{Input}, & \hat{g}_{T-I}(x) < \tau_{\text{restore}}, \\
-\text{Base}, & \hat{g}_{B-T}(x) > \tau_{\text{base}}, \\
+\text{Input}, & \hat{g}_{T-I}<\tau_{\text{restore}},\\
+\text{Base}, & \hat{g}_{B-T}>\tau_{\text{base}},\\
 \text{Tiny}, & \text{otherwise}.
 \end{cases}
-\end{equation}
-Here, $\tau_{\text{restore}}$ controls when restoration should be skipped, and $\tau_{\text{base}}$ controls when Base is worth using over Tiny.
-Thresholds are selected on es\_val\_inner.
+\]
+The thresholds are selected on an inner validation split.
 
 % ------------------------------------------------------------
-% 5. Experiments
+% 4. Experiments
 % ------------------------------------------------------------
 \section{Experiments}
 
-\subsection{Implementation Details}
+\subsection{Dataset and Splits}
 
-Tiny and Base are NAFNet variants.
-Tiny uses width 4 and Base uses width 8.
-Tiny candidates with learning rates $1\times10^{-3}$ and $5\times10^{-4}$ are compared on es\_val\_inner, and the $1\times10^{-3}$ Tiny model is selected.
-Base is the width-8 NAFNet model trained on train\_inner.
-The High candidate uses width 16 and is evaluated only for candidate analysis.
-After training Tiny and Base, we run them on train\_inner images to generate gain targets for FastGainRouter.
-Router thresholds are tuned on es\_val\_inner.
-All final metrics are reported on the official validation set.
+We use the official SIDL train and validation splits.
+The official validation set is held out for final evaluation only.
+Since SIDL does not provide a separate development split for our routing policy, we construct two internal splits from the official training set: an inner training split (\textit{train\_inner}) and an inner validation split (\textit{es\_val\_inner}).
+These names are specific to this project and are used to distinguish our internal protocol from the official SIDL split.
 
-\subsection{Baselines and Latency Protocol}
+The \textit{train\_inner} split is the source of all trainable components in the final pipeline.
+It is used to train the Tiny and Base restoration branches.
+After the restoration branches are fixed, the same split is also used to generate router supervision: we run Input, Tiny, and Base on each train\_inner sample and compute the Tiny-over-Input and Base-over-Tiny gains against the reference.
+Thus, train\_inner defines the data from which the router learns how the trained restoration branches behave.
 
-We compare against \textbf{Always Input}, \textbf{Always Tiny}, \textbf{Always Base}, and an oracle branch selector used only as an upper bound.
-Latency is reported as a measured component-based estimate:
-\begin{equation}
-    L = L_{\text{feature}} + L_{\text{router}} + L_{\text{branch}}.
-\end{equation}
-For dynamic routing, feature extraction and batch router prediction are included.
-This estimate corresponds to an offline or batch restoration setting and is not a fully optimized deployment runtime.
+The \textit{es\_val\_inner} split is not used for gradient updates of the restoration branches or the router.
+It is used for model selection and policy calibration: Tiny checkpoint selection, early stopping, and threshold selection for FastGainRouter.
+This split is therefore a development set inside the official training data, not an additional training set.
+
+The official validation split is used only once the restoration branches, router, and routing thresholds have been fixed.
+No image from the official validation split is used for branch training, router training, early stopping, or threshold tuning.
+This protocol allows us to report final results on a held-out validation set while still tuning the model within the official training data.
+
+All internal splits are constructed at the case level rather than at the patch level.
+SIDL contains multiple image patches that can originate from the same scene case.
+If patches from the same case were split across train and validation subsets, the validation results could be inflated by scene-level leakage.
+The case-level split reduces this risk by ensuring that all patches from the same case are assigned to the same internal split.
+
+\begin{table}[t]
+\centering
+\caption{Split usage in the final experimental protocol. The inner splits are project-specific subdivisions of the official SIDL training split.}
+\label{tab:split}
+\small
+\begin{tabular}{llrl}
+\toprule
+Split & Source & Samples & Role in this work \\
+\midrule
+train\_inner & official train & 51,264 & branch training and router target generation \\
+es\_val\_inner & official train & 5,616 & early stopping, checkpoint selection, threshold tuning \\
+official val & official val & 5,520 & held-out final evaluation only \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Operating Points}
+
+FastGainRouter uses threshold-based routing, so different thresholds produce different quality-latency operating points.
+We report two representative settings selected on the inner validation split.
+The \textbf{Balanced} setting uses thresholds that prioritize restoration quality while still reducing average latency relative to Always Base.
+The \textbf{Efficient} setting uses a more aggressive policy that reduces Base usage further and allows a small PSNR drop for larger latency reduction.
+These names are fixed before the final official validation evaluation and correspond to two points on the same routing trade-off curve, not to separately trained restoration models.
+
+\subsection{Implementation and Latency Protocol}
+
+Tiny and Base are NAFNet variants with widths 4 and 8, respectively.
+Tiny candidates with learning rates $1\times10^{-3}$ and $5\times10^{-4}$ are compared on the inner validation split, and the $1\times10^{-3}$ model is used.
+After training Tiny and Base, we run them on train\_inner to generate gain targets for the router.
+Router thresholds are selected on es\_val\_inner.
+
+We report PSNR, SSIM, LPIPS, and latency.
+For dynamic routing, latency is a measured component-based pipeline estimate:
+\[
+L=L_{\text{feature}}+L_{\text{router}}+L_{\text{branch}}.
+\]
+This is not a fully optimized deployment runtime; it is intended to compare average computation under a batch/offline restoration setting.
+For fixed baselines, the latency corresponds to the measured validation pipeline latency of the selected branch under the same evaluation procedure.
+For FastGainRouter, the reported latency includes fast feature extraction, batch router prediction, and the inference time of the branch selected for each sample.
 
 % ------------------------------------------------------------
-% 6. Results
+% 5. Results
 % ------------------------------------------------------------
 \section{Results}
 
-\subsection{Candidate Branch Audit}
+\subsection{Main Quantitative Comparison}
 
-Table~\ref{tab:candidate} summarizes branch-level quality and cost.
-Tiny substantially improves over Input while remaining small.
-Base improves over Tiny and achieves the best LPIPS among learned main branches.
-High achieves the highest PSNR and SSIM, but it worsens LPIPS and requires much larger model size and latency.
-Therefore, Input/Tiny/Base is selected as the main branch set.
+The main comparison evaluates whether adaptive routing can improve the PSNR-latency trade-off over fixed-branch inference.
+Always Base is the strongest fixed-branch baseline in terms of PSNR, SSIM, and LPIPS among the three main branches, so it serves as the primary reference point.
+Always Tiny represents a lower-cost restoration baseline, while Always Input serves as a no-restoration lower bound.
 
-\begin{table}[!t]
+\begin{table}[t]
 \centering
-\caption{Candidate branch audit on the official validation set. Lower LPIPS is better.}
-\label{tab:candidate}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lccccc}
-\toprule
-Branch & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & Ckpt (MB) & Fwd. (ms) \\
-\midrule
-Input & 21.6725 & 0.8070 & 0.2573 & 0.00 & 0.00 \\
-Tiny & 22.9878 & 0.8082 & 0.2420 & 0.35 & 8.32 \\
-Base & 23.0935 & 0.8145 & 0.2399 & 1.17 & 8.77 \\
-High & 23.1499 & 0.8179 & 0.2528 & 9.76 & 11.81 \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-\subsection{Branch Diversity and Gain Analysis}
-
-Table~\ref{tab:diversity-gain} summarizes why adaptive routing is useful.
-Input, Tiny, and Base are each optimal for a non-trivial portion of samples.
-Tiny provides a large average gain over Input, whereas Base provides a much smaller average gain over Tiny.
-This motivates a router that uses Base selectively rather than applying it to all images.
-
-\begin{table}[!t]
-\centering
-\caption{Branch diversity and gain analysis on the official validation set.}
-\label{tab:diversity-gain}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lccc}
-\toprule
-\multicolumn{4}{c}{\textbf{Optimal branch ratio}} \\
-\midrule
-Metric & Input & Tiny & Base \\
-\midrule
-PSNR-optimal & 27.0\% & 27.8\% & 45.2\% \\
-LPIPS-optimal & 24.7\% & 28.0\% & 47.3\% \\
-\midrule
-\multicolumn{4}{c}{\textbf{Gain statistics}} \\
-\midrule
-Gain & Mean & Median & Ratio $>$ 0.2 \\
-\midrule
-Tiny $-$ Input & 1.315 & 1.776 & 70.3\% \\
-Base $-$ Tiny & 0.106 & 0.061 & 41.7\% \\
-\bottomrule
-\end{tabular}
-}
-\end{table}
-
-\subsection{Main Quantitative Results}
-
-Table~\ref{tab:main} compares FastGainRouter with fixed baselines.
-Ours-Balanced improves PSNR over Always Base while reducing latency.
-Ours-Efficient improves PSNR over Always Tiny while being slightly faster than Always Tiny, and reduces latency by 18.5\% compared with Always Base with a 0.066 dB PSNR loss.
-
-\begin{table}[!t]
-\centering
-\caption{Main comparison on the official validation set. Latency is a measured component-based estimate.}
+\caption{Main comparison on the official validation set. Latency is measured as component-based pipeline latency, not pure forward micro-benchmark latency. Relative latency reduction is computed with respect to Always Base, which serves as the strongest fixed-branch baseline.}
 \label{tab:main}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{lcccc}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{lcccccc}
 \toprule
-Method & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & Lat. $\downarrow$ \\
+Method & PSNR $\uparrow$ & SSIM $\uparrow$ & LPIPS $\downarrow$ & Latency (ms/img) $\downarrow$ & $\Delta$PSNR vs Base & Rel. Lat. Red. vs Base \\
 \midrule
-Always Input & 21.6725 & 0.8070 & 0.2573 & 0.00 \\
-Always Tiny & 22.9878 & 0.8082 & 0.2420 & 99.31 \\
-Always Base & 23.0935 & 0.8145 & 0.2399 & 119.29 \\
-Ours-Balanced & 23.1250 & 0.8141 & 0.2406 & 108.43 \\
-Ours-Efficient & 23.0276 & 0.8119 & 0.2424 & 97.19 \\
+Always Input & 21.6725 & 0.8070 & 0.2573 & 0.00 & -1.4210 & N/A \\
+Always Tiny & 22.9878 & 0.8082 & 0.2420 & 99.31 & -0.1057 & 16.7\% \\
+Always Base & 23.0935 & 0.8145 & 0.2399 & 119.29 & 0.0000 & 0.0\% \\
+Ours-Balanced & 23.1250 & 0.8141 & 0.2406 & 108.43 & \textbf{+0.0315} & \textbf{9.1\%} \\
+Ours-Efficient & 23.0276 & 0.8119 & 0.2424 & 97.19 & \textbf{-0.0659} & \textbf{18.5\%} \\
 \bottomrule
 \end{tabular}
 }
 \end{table}
 
-Compared with Always Base, Ours-Balanced improves PSNR by 0.031 dB while reducing latency by 9.1\%.
-Ours-Efficient reduces latency by 18.5\% with a 0.066 dB PSNR loss.
-Compared with Always Tiny, Ours-Efficient achieves higher PSNR while using slightly lower latency.
+Ours-Balanced achieves a near-Base operating point with lower latency.
+It improves PSNR over Always Base by 0.031 dB while reducing latency by 9.1\%.
+This gain is small in absolute PSNR, but it is meaningful for the goal of this work because the stronger fixed branch is not invoked for every input.
 
-\subsection{Quality--Latency Trade-off and Branch Usage}
+Ours-Efficient shifts the policy toward lower computation.
+Compared with Always Base, it reduces latency by 18.5\% with a 0.066 dB PSNR drop.
+Compared with Always Tiny, it improves PSNR by 0.040 dB while reducing latency by 2.1\%.
+Thus, the efficient setting is not merely a lower-cost variant of Base; it also provides a better PSNR-latency point than always using Tiny.
 
-Figure~\ref{fig:tradeoff-action} visualizes the quality-latency trade-off and branch usage.
-FastGainRouter provides operating points between Always Tiny and Always Base.
-The efficient setting increases Tiny usage and reduces Base usage, leading to lower average latency.
+The improvement should be interpreted specifically as a PSNR-latency trade-off.
+Ours-Balanced does not uniformly dominate Always Base across SSIM and LPIPS, and Ours-Efficient slightly worsens LPIPS compared with Always Tiny.
+For this reason, we use PSNR-latency as the main quantitative claim and discuss the remaining metric trade-offs later.
 
-\begin{figure*}[!t]
+\subsection{Operating Points and Branch Usage}
+
+The two FastGainRouter settings correspond to different calibrated operating points of the same gain-based router.
+In the balanced setting, $(\tau_{\mathrm{restore}}, \tau_{\mathrm{base}})=(0.3,0.1)$, which makes the policy more willing to apply restoration and to invoke Base.
+This setting selects Base for 49.3\% of validation samples and therefore preserves near-Base restoration quality while reducing average latency.
+
+The efficient setting uses larger thresholds, $(\tau_{\mathrm{restore}}, \tau_{\mathrm{base}})=(0.6,0.5)$.
+This makes the router more conservative about restoration and more selective about Base selection.
+As a result, Base usage decreases from 49.3\% to 13.2\%, while Tiny usage increases from 39.6\% to 71.7\%.
+This shift in branch usage explains why Ours-Efficient achieves a larger latency reduction with only a small PSNR loss.
+
+Figure~\ref{fig:tradeoff-action} visualizes the resulting PSNR-latency behavior and branch usage.
+Ours-Balanced moves from Always Base toward lower latency while slightly improving PSNR, whereas Ours-Efficient moves from Always Tiny toward higher PSNR while also reducing latency slightly.
+The branch-usage plot shows that the efficient setting mainly reduces computation by replacing many Base decisions with Tiny decisions, rather than by simply bypassing restoration.
+Since the PSNR axis is zoomed, the visual trends should be interpreted together with the numerical values in Table~\ref{tab:main}.
+
+\begin{figure}[!htbp]
     \centering
     \begin{subfigure}{0.48\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{fig_psnr_latency_focus_v2.pdf}
-        \caption{Quality-latency trade-off.}
+        \includegraphics[width=\linewidth]{fig_psnr_latency.png}
+        \caption{PSNR-latency trade-off.}
         \label{fig:pareto}
     \end{subfigure}
     \hfill
@@ -425,76 +360,153 @@ The efficient setting increases Tiny usage and reduces Base usage, leading to lo
         \label{fig:action}
     \end{subfigure}
     \caption{
-    FastGainRouter trades off restoration quality and computation.
-    Always Input is omitted from (a) for readability and is reported in Table~\ref{tab:main}.
+    FastGainRouter provides PSNR-latency operating points between Always Tiny and Always Base.
+    The PSNR axis in (a) is zoomed to show small differences among restoration methods.
+    Dashed arrows indicate improvements in the PSNR-latency plane.
     }
     \label{fig:tradeoff-action}
-\end{figure*}
+\end{figure}
 
-\subsection{Qualitative Results}
+\begin{table}[!htbp]
+\centering
+\caption{
+Operating points used by FastGainRouter.
+Thresholds are selected on the inner validation split before final evaluation.
+Branch usage is reported on the official validation set.
+The selection criterion describes the internal threshold-search constraint used to choose each operating point.
+}
+\label{tab:operating_points}
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{lcccl}
+\toprule
+Setting
+& $\tau_{\mathrm{restore}}$
+& $\tau_{\mathrm{base}}$
+& Input / Tiny / Base (\%)
+& Selection criterion \\
+\midrule
+Balanced
+& 0.3
+& 0.1
+& 11.1 / 39.6 / 49.3
+& PSNR $\geq$ Always Base $-0.1$ dB \\
+Efficient
+& 0.6
+& 0.5
+& 15.1 / 71.7 / 13.2
+& PSNR $\geq$ Always Tiny $-0.03$ dB \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Figure~\ref{fig:qualitative} shows qualitative examples of adaptive branch selection.
-The examples are not intended to claim state-of-the-art restoration quality.
-Instead, they illustrate four different routing behaviors: skipping restoration, using Tiny when it is sufficient, using Base when necessary, and selecting a lower-cost branch in the efficient setting.
+\FloatBarrier
 
-\begin{figure*}[!t]
+\subsection{Branch Diversity and Gain Analysis}
+
+Adaptive routing is useful only if different inputs prefer different restoration budgets.
+The branch-level statistics in Table~\ref{tab:branch-gain} support this condition.
+Under PSNR, Input, Tiny, and Base are optimal for 27.0\%, 27.8\%, and 45.2\% of validation samples, respectively.
+This indicates that no single branch is optimal for all inputs, and that fixed-model restoration can be inefficient or unnecessary for a non-trivial subset of samples.
+
+The gain statistics show why selective use of Base is reasonable.
+Tiny improves over Input by 1.315 dB on average, and 70.3\% of samples gain more than 0.2 dB from Tiny restoration.
+In contrast, Base improves over Tiny by only 0.106 dB on average, with a median gain of 0.061 dB.
+Thus, Tiny provides most of the restoration benefit for many inputs, while Base is useful mainly for the subset where the additional gain justifies its cost.
+
+\begin{table}[H]
+\centering
+\caption{Branch diversity and gain analysis on the official validation set.}
+\label{tab:branch-gain}
+\footnotesize
+\begin{subtable}{0.45\textwidth}
+\centering
+\caption{Optimal branch ratio.}
+\begin{tabular}{lccc}
+\toprule
+Metric & Input & Tiny & Base \\
+\midrule
+PSNR & 27.0\% & 27.8\% & 45.2\% \\
+LPIPS & 24.7\% & 28.0\% & 47.3\% \\
+\bottomrule
+\end{tabular}
+\end{subtable}
+\hfill
+\begin{subtable}{0.45\textwidth}
+\centering
+\caption{Gain statistics.}
+\begin{tabular}{lccc}
+\toprule
+Gain & Mean & Median & $>$0.2 \\
+\midrule
+Tiny $-$ Input & 1.315 & 1.776 & 70.3\% \\
+Base $-$ Tiny & 0.106 & 0.061 & 41.7\% \\
+\bottomrule
+\end{tabular}
+\end{subtable}
+\end{table}
+
+\FloatBarrier
+
+\subsection{Qualitative Examples}
+
+The qualitative examples provide a visual check of the three routing behaviors observed in the quantitative analysis.
+The first row corresponds to a bypass case, where the router selects Input and avoids unnecessary restoration.
+The second row shows a Tiny-sufficient case, where the lightweight branch produces a restoration result comparable to the stronger branch.
+The third row shows a Base-selected case, where the router assigns the input to the stronger restoration branch.
+
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.92\textwidth,height=0.60\textheight,keepaspectratio]{qualitative_grid_v1.png}
+    % Reduced to fit in the blank space on page 6.
+    \includegraphics[width=0.84\textwidth,height=0.30\textheight,keepaspectratio]{qualitative_grid.png}
     \caption{
     Qualitative examples of adaptive branch selection.
-    Numbers indicate PSNR$\uparrow$ / LPIPS$\downarrow$.
-    The rows show a skip case, a Tiny-sufficient case, a Base-needed case, and an efficient-routing case.
+    From left to right in each row: Input, Tiny, Base, and GT.
+    The red outline marks the branch selected by FastGainRouter using only the degraded input.
     }
     \label{fig:qualitative}
-\end{figure*}
+\end{figure}
+
+These examples are not intended to prove visual superiority for all samples.
+Rather, they illustrate why a single fixed branch can be inappropriate: some inputs should be left unchanged, some can be handled by Tiny, and some still benefit from Base.
+The selected branch is determined only from the degraded input, while the ground truth is shown only for visual comparison.
 
 \FloatBarrier
 
 % ------------------------------------------------------------
-% 7. Discussion and Limitations
+% 6. Discussion and Conclusion
 % ------------------------------------------------------------
-\section{Discussion and Limitations}
+\section{Discussion and Conclusion}
 
-\paragraph{Interpretation of small PSNR differences.}
-Ours-Efficient loses only 0.066 dB PSNR compared with Always Base while reducing latency by 18.5\%.
-Such a small average PSNR difference is modest in terms of pixel fidelity.
-However, dirty-lens degradation may contain local artifacts such as water droplets, scratches, and scattering.
-Therefore, PSNR should be interpreted together with LPIPS and qualitative examples.
+FastGainRouter demonstrates that adaptive restoration budget selection can be useful on SIDL, but the results should be interpreted within the scope of this study.
+The method is designed as a feasibility study for input-adaptive computation allocation, not as a fully optimized deployment system or a replacement for restoration backbone research.
+Its main value is to show that dirty-lens restoration can be studied not only as a fixed-model restoration problem, but also as a routing problem that decides how much computation each input requires.
+
+\paragraph{Metric trade-offs.}
+The balanced mode slightly improves PSNR over Always Base, while SSIM and LPIPS remain comparable rather than uniformly better.
+The efficient mode trades a small PSNR loss for a larger latency reduction.
+Thus, our claim is a favorable PSNR-latency trade-off, not dominance across every quality metric.
+This distinction is important because PSNR measures pixel-level fidelity, whereas perceptual differences may be better reflected by LPIPS and qualitative examples.
 
 \paragraph{Latency estimate.}
-Our main latency is a component-based estimate, not a fully optimized deployment runtime.
-It includes feature extraction, batch router prediction, and selected branch inference.
-A naive single-image sklearn RandomForest implementation can introduce large overhead.
-A deployment-oriented system should use optimized or neural router inference.
+The reported latency is a component-based pipeline estimate.
+It includes feature extraction, batch router prediction, and selected branch inference, but it is not a fully optimized deployment runtime.
+A deployment-oriented implementation should optimize the router or replace it with a lightweight neural module suitable for low-overhead single-image inference.
 
 \paragraph{Router target generation.}
 The router is trained using gain targets generated from train\_inner, which is also used to train Tiny and Base.
-A stricter protocol could use cross-fitting or a separate router-training split so that gain targets are generated on restoration-unseen cases.
-We leave this as future work.
-The official validation set is held out and used only for final evaluation.
+This does not affect the official validation set, which is held out for final evaluation, but it is not the strictest possible protocol.
+A stricter design could use cross-fitting or a separate router-training split so that router targets are generated on restoration-unseen cases.
 
-\paragraph{Restoration quality.}
-This work does not aim to achieve state-of-the-art restoration quality.
-Tiny and Base are intentionally small NAFNet variants used to study adaptive restoration budget selection.
-Severe dirty-lens degradations may still require stronger restoration models.
+\paragraph{Branch scope.}
+This work uses a simple Input/Tiny/Base branch family.
+Stronger backbones or more diverse branches could change the routing behavior and are left for future work.
+Overall, the observed branch diversity and PSNR-latency trade-offs suggest that adaptive budget selection complements fixed-model SIDL restoration.
 
-% ------------------------------------------------------------
-% 8. Conclusion
-% ------------------------------------------------------------
-\section{Conclusion}
-
-We studied input-adaptive restoration for smartphone images with dirty lenses.
-Building on the SIDL benchmark, we asked whether every dirty-lens image requires the same restoration budget.
-We constructed Input, Tiny, and Base branches and proposed FastGainRouter, which predicts restoration gains from lightweight image statistics and selects a branch accordingly.
-
-Our results show that Input, Tiny, and Base are each optimal for a substantial subset of validation samples.
-FastGainRouter improves the quality-latency trade-off compared with fixed baselines.
-In the balanced setting, it improves PSNR over Always Base while reducing latency.
-In the efficient setting, it reduces latency substantially with only a small PSNR loss.
-These results suggest that adaptive restoration budget selection is a promising direction for efficient dirty-lens image restoration.
-
-\balance
+\clearpage
 \bibliographystyle{plain}
 \bibliography{references}
 
 \end{document}
+```
