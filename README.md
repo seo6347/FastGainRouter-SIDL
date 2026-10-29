@@ -1,75 +1,152 @@
-# FastGainRouter for SIDL Dirty-Lens Restoration
+# FastGainRouter
+## Input-Adaptive Efficient Restoration for Smartphone Images with Dirty Lenses
 
-This repository contains scripts, configs, final result summaries, and figures for **FastGainRouter**, an input-adaptive restoration budget selection framework for SIDL dirty-lens image restoration.
+**Does every dirty-lens image need the same restoration budget?**
+
+FastGainRouter selects whether to bypass restoration, apply a lightweight model, or use a stronger model for each degraded image. It predicts restoration gains from nine inexpensive image statistics and allocates computation through an input-adaptive routing policy.
+
+**Author:** [Donggyun Seo](https://github.com/seo6347) · Department of AI Software, Soongsil University
+
+[Project Paper (PDF)](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) · [Main Results](results/final_compact_main_table_v1.md) · [Experiment Notes](docs/reproduce.md)
 
 ## Overview
 
-FastGainRouter selects one of three branches for each degraded input image:
+Applying the same restoration model to every input can waste computation or introduce unnecessary changes. On the SIDL validation set, the Input, Tiny, and Base branches are individually optimal for **27.0%, 27.8%, and 45.2%** of samples under PSNR, respectively. These ground-truth-based oracle statistics motivate adaptive routing; they are not the router's predicted branch usage.
 
-- **Input**: bypass restoration and return the degraded input.
-- **Tiny**: lightweight NAFNet restoration branch.
-- **Base**: stronger NAFNet restoration branch.
+FastGainRouter explores this problem with three branches:
 
-The router predicts restoration gains from lightweight image statistics and selects a branch using threshold-based decision rules.
+| Branch | Operation |
+| --- | --- |
+| **Input** | Return the degraded input unchanged. |
+| **Tiny** | Restore the image with a width-4 NAFNet variant. |
+| **Base** | Restore the image with a width-8 NAFNet variant. |
 
-## Main Claim
+The research focuses on **when to use each restoration branch**, rather than introducing a new restoration backbone.
 
-Not every dirty-lens image requires the same restoration budget. Some inputs are better left unchanged, many can be handled by Tiny, and only a subset requires Base.
+## Key Contributions
+
+- **Analyze restoration-budget diversity:** identify inputs for which bypassing restoration, using Tiny, or using Base yields the best PSNR.
+- **Formulate routing as gain prediction:** predict Tiny-over-Input and Base-over-Tiny gains instead of directly classifying hard oracle labels.
+- **Evaluate quality–latency trade-offs:** demonstrate two calibrated operating points that reduce estimated average pipeline latency with near-Base PSNR.
+
+## Method
+
+![FastGainRouter method overview](figures/method_overview_v1.png)
+
+### 1. Extract features from the degraded input
+
+The router uses nine image statistics:
+
+- Grayscale mean and standard deviation.
+- Dark and bright pixel ratios.
+- HSV saturation mean and standard deviation.
+- HSV value mean and standard deviation.
+- Laplacian variance.
+
+Ground-truth images, task metadata, and difficulty labels are **not used as routing inputs at inference time**.
+
+### 2. Predict restoration gains
+
+For training, branch outputs are compared with the reference image to compute:
+
+- **Tiny-over-Input gain:** PSNR(Tiny) − PSNR(Input).
+- **Base-over-Tiny gain:** PSNR(Base) − PSNR(Tiny).
+
+The released training code includes Ridge and Random Forest regressors. The reported FastGainRouter operating points use **Random Forest gain regression (RFGain)**.
+
+### 3. Select a branch
+
+The policy first checks whether restoration is worthwhile, then whether Base provides enough additional benefit:
+
+1. If predicted Tiny-over-Input gain is below `tau_restore`, select **Input**.
+2. Otherwise, if predicted Base-over-Tiny gain exceeds `tau_base`, select **Base**.
+3. Otherwise, select **Tiny**.
+
+Thresholds are calibrated on the inner validation split.
+
+| Operating point | tau_restore | tau_base | Selected Input / Tiny / Base on official validation |
+| --- | ---: | ---: | --- |
+| **Balanced** | 0.3 | 0.1 | 11.1% / 39.6% / 49.3% |
+| **Efficient** | 0.6 | 0.5 | 15.1% / 71.7% / 13.2% |
+
+Balanced and Efficient are two threshold settings of the **same gain-based router**, not separately trained restoration models.
 
 ## Main Results
 
-See:
+Results are reported on **5,520 samples from the official SIDL validation split**.
 
-- `results/final_compact_main_table_v1.csv`
-- `results/final_compact_key_claims_v1.txt`
-- `paper/figures/`
+| Method | PSNR ↑ | SSIM ↑ | LPIPS ↓ | Estimated latency (ms/image) ↓ | ΔPSNR vs Base | Latency reduction vs Base |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Always Input | 21.6725 | 0.8070 | 0.2573 | 0.00 | −1.4210 | — |
+| Always Tiny | 22.9878 | 0.8082 | 0.2420 | 99.31 | −0.1057 | 16.7% |
+| Always Base | 23.0935 | 0.8145 | 0.2399 | 119.29 | 0.0000 | 0.0% |
+| **FastGainRouter — Balanced** | **23.1250** | 0.8141 | 0.2406 | **108.43** | **+0.0315** | **9.1%** |
+| **FastGainRouter — Efficient** | **23.0276** | 0.8119 | 0.2424 | **97.19** | **−0.0659** | **18.5%** |
 
-## Repository Structure
+- **Balanced:** slightly higher PSNR than Always Base with a 9.1% latency reduction.
+- **Efficient:** an 18.5% latency reduction relative to Always Base with a 0.0659 dB PSNR decrease.
+- Compared with Always Tiny, Efficient improves PSNR by about 0.040 dB and reduces latency by about 2.1%.
 
-```text
-configs/   BasicSR/NAFNet config files used in the final experiments
-scripts/   Training, inference, table generation, router training, and finalization scripts
-results/   Final CSV/MD/TXT summaries used in the report
-figures/   Final plots and selected qualitative figures
-docs/      Reproduction notes and data/weight instructions
-paper/     LaTeX paper source or placeholder
-```
+**Latency interpretation.** Reported latency is a measured **component-based pipeline estimate**: feature extraction + batch router prediction + selected branch inference. It represents a batch/offline evaluation setting, not an optimized single-image deployment benchmark. Always Input's zero denotes bypassing restoration within this accounting, not zero image-loading or application overhead.
 
-## Dataset
+**Metric interpretation.** The main claim is an improved **PSNR–latency trade-off**. Balanced does not outperform Always Base on every quality metric; Efficient also has a slightly worse LPIPS than Always Tiny.
 
-The SIDL dataset is **not included** in this repository. Place the dataset manually under the expected project structure before running scripts.
+![PSNR–latency trade-off](paper/figures/fig_psnr_latency_focus_v2.png)
 
-See `docs/data_and_weights.md`.
+![Branch selection ratios](paper/figures/fig_action_ratio_horizontal_v2.png)
 
-## Reproduction
+Numerical summaries: [CSV](results/final_compact_main_table_v1.csv) · [Markdown table](results/final_compact_main_table_v1.md) · [Key claims](results/final_compact_key_claims_v1.txt).
 
-See `docs/reproduce.md`.
+## Experimental Protocol
 
-## Notes
+Internal splits are constructed at the **case level**, keeping patches from the same case together.
 
-Large files are intentionally excluded:
+| Split | Source | Samples | Role |
+| --- | --- | ---: | --- |
+| `train_inner` | Official SIDL training split | 51,264 | Restoration branch training and router gain-target generation |
+| `es_val_inner` | Official SIDL training split | 5,616 | Early stopping, checkpoint selection, and routing-threshold calibration |
+| Official validation | Official SIDL validation split | 5,520 | Held-out final evaluation |
 
-- raw SIDL dataset
-- NAFNet checkpoints
-- full inference outputs
-- generated PNG outputs
-- logs
-- bulk per-threshold CSV files
-- large router `.joblib` artifacts
+The router learns from gain targets generated on the same `train_inner` split used to train the restoration branches. The official validation split remains held out, but cross-fitting or a separate router-training split would provide a stricter target-generation protocol.
 
-This repository is intended for code and result-summary release, not for storing full experiment artifacts.
+## Qualitative Examples
 
-## Paper Assets
+![Qualitative branch selection examples](paper/figures/qualitative_grid.png)
 
-Final paper figures are stored in:
+The figure illustrates bypass, Tiny-sufficient, and Base-selected cases. The red outline marks the selected branch; ground truth is shown for comparison only. These examples illustrate routing behavior rather than visual superiority on every sample.
 
-```text
-paper/figures/
-```
+## Released Materials
 
-The final paper source is stored in:
+This repository releases **research code, experiment configurations, result summaries, and paper assets** for inspecting the method and reported findings.
 
-```text
-paper/main.tex
-paper/references.bib
-```
+| Path | Contents |
+| --- | --- |
+| [scripts/](scripts/) | Training orchestration, branch inference, feature extraction, gain regression, and result-generation scripts |
+| [configs/](configs/) | Training and evaluation configurations |
+| [results/](results/) | Aggregated numerical results and analysis summaries |
+| [figures/](figures/) | Method overview and selected experiment figures |
+| [paper/](paper/) | Project paper PDF, LaTeX source, bibliography, and figures |
+| [docs/reproduce.md](docs/reproduce.md) | Original experiment workflow and environment assumptions |
+| [docs/data_and_weights.md](docs/data_and_weights.md) | Data, model dependencies, and excluded artifacts |
+
+The original scripts retain experiment-specific paths and dependencies. Raw SIDL data, restoration checkpoints, router model artifacts, and bulk intermediate outputs are not included. This is a **code and results release**, rather than a self-contained reproduction package.
+
+The PDF is the primary reading version of the paper. The released LaTeX source may require figure-reference adjustments before recompilation.
+
+## Scope and Limitations
+
+- Evaluated on SIDL with an Input/Tiny/Base family built from NAFNet variants; generalization to other datasets and backbones is not established.
+- Latency is estimated from measured components and includes batch router prediction; deployment runtime requires separate validation.
+- Quality gains are small and should be interpreted alongside SSIM, LPIPS, and qualitative examples.
+- Router targets are generated from restoration-training samples, as described above.
+
+## Author & Acknowledgments
+
+**Donggyun Seo** independently carried out the research formulation, routing-method design, implementation, experiments, analysis, and paper writing.
+
+This work builds on existing research resources:
+
+- **SIDL:** Sooyoung Choi, Sungyong Park, and Heewon Kim. *SIDL: A Real-World Dataset for Restoring Smartphone Images with Dirty Lenses.* AAAI, 2025.
+- **NAFNet:** Liangyu Chen, Xiaojie Chu, Xiangyu Zhang, and Jian Sun. *Simple Baselines for Image Restoration.* ECCV, 2022.
+
+Dataset creation and the original NAFNet architecture are credited to their respective authors. Full references are included in the [project paper](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) and [bibliography](paper/references.bib).
