@@ -5,9 +5,13 @@
 
 FastGainRouter selects whether to bypass restoration, apply a lightweight model, or use a stronger model for each degraded image. It predicts restoration gains from nine inexpensive image statistics and allocates computation through an input-adaptive routing policy.
 
-**Author:** [Donggyun Seo](https://github.com/seo6347) · Department of AI Software, Soongsil University
+**An individual project for the Deep Learning Programming course at Soongsil University.**
 
-[Project Paper (PDF)](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) · [Main Results](results/final_compact_main_table_v1.md) · [Experiment Notes](docs/reproduce.md)
+**Developed by:** [Donggyun Seo](https://github.com/seo6347) · Department of AI Software, Soongsil University
+
+[Project Report (PDF)](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) · [Main Results](results/final_compact_main_table_v1.md) · [Experiment Notes](docs/reproduce.md)
+
+The accompanying report documents the method and experiments and has not been submitted for publication.
 
 ## Overview
 
@@ -21,9 +25,9 @@ FastGainRouter explores this problem with three branches:
 | **Tiny** | Restore the image with a width-4 NAFNet variant. |
 | **Base** | Restore the image with a width-8 NAFNet variant. |
 
-The research focuses on **when to use each restoration branch**, rather than introducing a new restoration backbone.
+The project focuses on **when to use each restoration branch**, rather than introducing a new restoration backbone.
 
-## Key Contributions
+## Project Highlights
 
 - **Analyze restoration-budget diversity:** identify inputs for which bypassing restoration, using Tiny, or using Base yields the best PSNR.
 - **Formulate routing as gain prediction:** predict Tiny-over-Input and Base-over-Tiny gains instead of directly classifying hard oracle labels.
@@ -117,7 +121,7 @@ The figure illustrates bypass, Tiny-sufficient, and Base-selected cases. The red
 
 ## Released Materials
 
-This repository releases **research code, experiment configurations, result summaries, and paper assets** for inspecting the method and reported findings.
+This repository releases **project code, experiment configurations, result summaries, and report assets** for inspecting the method and reported findings.
 
 | Path | Contents |
 | --- | --- |
@@ -125,13 +129,13 @@ This repository releases **research code, experiment configurations, result summ
 | [configs/](configs/) | Training and evaluation configurations |
 | [results/](results/) | Aggregated numerical results and analysis summaries |
 | [figures/](figures/) | Method overview and selected experiment figures |
-| [paper/](paper/) | Project paper PDF, LaTeX source, bibliography, and figures |
+| [paper/](paper/) | Project report PDF, source, bibliography, and figures |
 | [docs/reproduce.md](docs/reproduce.md) | Original experiment workflow and environment assumptions |
 | [docs/data_and_weights.md](docs/data_and_weights.md) | Data, model dependencies, and excluded artifacts |
 
 The original scripts retain experiment-specific paths and dependencies. Raw SIDL data, restoration checkpoints, router model artifacts, and bulk intermediate outputs are not included. This is a **code and results release**, rather than a self-contained reproduction package.
 
-The PDF is the primary reading version of the paper. The released LaTeX source may require figure-reference adjustments before recompilation.
+The PDF is the primary reading version of the report. The report source may require figure-reference adjustments before recompilation.
 
 ## Scope and Limitations
 
@@ -140,13 +144,13 @@ The PDF is the primary reading version of the paper. The released LaTeX source m
 - Quality gains are small and should be interpreted alongside SSIM, LPIPS, and qualitative examples.
 - Router targets are generated from restoration-training samples, as described above.
 
-## Author & Acknowledgments
+## Project Role & References
 
-**Donggyun Seo** independently carried out the research formulation, routing-method design, implementation, experiments, analysis, and paper writing.
+**Donggyun Seo** independently carried out project planning, routing-method design, implementation, model training, evaluation, result analysis, and report writing.
 
-This work builds on existing research resources:
+This project builds on existing research resources:
 
 - **SIDL:** Sooyoung Choi, Sungyong Park, and Heewon Kim. *SIDL: A Real-World Dataset for Restoring Smartphone Images with Dirty Lenses.* AAAI, 2025.
 - **NAFNet:** Liangyu Chen, Xiaojie Chu, Xiangyu Zhang, and Jian Sun. *Simple Baselines for Image Restoration.* ECCV, 2022.
 
-Dataset creation and the original NAFNet architecture are credited to their respective authors. Full references are included in the [project paper](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) and [bibliography](paper/references.bib).
+Dataset creation and the original NAFNet architecture are credited to their respective authors. Full references are included in the [project report](paper/FastGainRouter_Input-Adaptive_Efficient_Restoration_for_Smartphone_Images_with_Dirty_Lenses.pdf) and [bibliography](paper/references.bib).
